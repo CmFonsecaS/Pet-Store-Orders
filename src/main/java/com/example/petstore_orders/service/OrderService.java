@@ -1,76 +1,156 @@
 package com.example.petstore_orders.service;
 
-import com.example.petstore_orders.model.*;
+import com.example.petstore_orders.dto.OrderDTO;
+import com.example.petstore_orders.dto.ProductDTO;
+import com.example.petstore_orders.exception.ResourceNotFoundException;
+import com.example.petstore_orders.model.Order;
+import com.example.petstore_orders.model.OrderItem;
+import com.example.petstore_orders.model.Product;
+import com.example.petstore_orders.model.OrderStatus;
+import com.example.petstore_orders.repository.OrderRepository;
+import com.example.petstore_orders.repository.ProductRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.annotation.PostConstruct;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class OrderService {
 
-    private final List<Product> products = new ArrayList<>();
-    private final List<Order> orders = new ArrayList<>();
+    private final ProductRepository productRepository;
+    private final OrderRepository orderRepository;
 
-    @PostConstruct
-    public void init() {
-        // Inicializar Productos
-        products.add(new Product(1L, "Comida Premium para Perros", "Nutrición", 4500, 120, "Cachupin", "Croquetas ricas en nutrientes para perros activos", "Perros"));
-        products.add(new Product(2L, "Varita con Plumas", "Juguetes", 1500, 45, "KittyFun", "Juguete interactivo con plumas naturales", "Gatos"));
-        products.add(new Product(3L, "Shampoo Anticaída de Pelo", "Higiene", 2200, 30, "CleanPet", "Shampoo orgánico de aloe vera para piel sensible", "Dog/Cat"));
-        products.add(new Product(4L, "Cama Ortopédica para Mascotas", "Comfort", 8900, 15, "PetSafe", "Cama de espuma viscoelástica para mascotas mayores", "Perros/Gatos"));
-
-        // Inicializar Ordenes
-        // Orden 1
-        List<OrderItem> items1 = new ArrayList<>();
-        items1.add(new OrderItem(1L, 1L, "Comida Premium para Perros", 2, 4500));
-        items1.add(new OrderItem(2L, 4L, "Cama Ortopédica para Mascotas", 1, 8900));
-        orders.add(new Order(101L, LocalDate.now().minusDays(2), "León Osa", "osa@gmail.com", "123 Riesco, Villa Osa", 187, OrderStatus.ENTREGADO, items1));
-
-        // Orden 2
-        List<OrderItem> items2 = new ArrayList<>();
-        items2.add(new OrderItem(3L, 2L, "Varita con Plumas", 3, 15));
-        orders.add(new Order(102L, LocalDate.now().minusDays(1), "Don Gato", "dongato@gmail.com", "456 Meow Ave, New York City", 45, OrderStatus.ENVIADO, items2));
-
-        // Orden 3
-        List<OrderItem> items3 = new ArrayList<>();
-        items3.add(new OrderItem(4L, 3L, "Anti-Shed Shampoo", 1, 2200));
-        orders.add(new Order(103L, LocalDate.now(), "Leonardo Lobos", "leoLobos@gmail.com", "789 Villa Lobos, Zootopia", 22, OrderStatus.PROCESANDO, items3));
+    public OrderService(ProductRepository productRepository, OrderRepository orderRepository) {
+        this.productRepository = productRepository;
+        this.orderRepository = orderRepository;
     }
 
+    // === PRODUCTOS CRUD ===
+
     public List<Product> getAllProducts() {
-        return products;
+        log.info("Consultando todos los productos");
+        return productRepository.findAll();
     }
 
     public Product getProductById(Long id) {
-        return products.stream()
-                .filter(p -> p.getId().equals(id))
-                .findFirst()
-                .orElse(null);
+        log.info("Buscando producto con ID: {}", id);
+        return productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado con ID: " + id));
+    }
+
+    @Transactional
+    public Product saveProduct(ProductDTO productDTO) {
+        log.info("Guardando nuevo producto: {}", productDTO.getName());
+        Product product = new Product();
+        mapProductDtoToEntity(productDTO, product);
+        return productRepository.save(product);
+    }
+
+    @Transactional
+    public Product updateProduct(Long id, ProductDTO productDTO) {
+        log.info("Actualizando producto con ID: {}", id);
+        Product product = getProductById(id);
+        mapProductDtoToEntity(productDTO, product);
+        return productRepository.save(product);
+    }
+
+    @Transactional
+    public void deleteProduct(Long id) {
+        log.info("Eliminando producto con ID: {}", id);
+        Product product = getProductById(id);
+        productRepository.delete(product);
     }
 
     public List<Product> getProductsByCategory(String category) {
-        return products.stream()
+        log.info("Consultando productos por categoría: {}", category);
+        return productRepository.findAll().stream()
                 .filter(p -> p.getCategory().equalsIgnoreCase(category))
                 .collect(Collectors.toList());
     }
 
+    // === ORDENES CRUD ===
+
     public List<Order> getAllOrders() {
-        return orders;
+        log.info("Consultando todas las órdenes");
+        return orderRepository.findAll();
     }
 
     public Order getOrderById(Long id) {
-        return orders.stream()
-                .filter(o -> o.getId().equals(id))
-                .findFirst()
-                .orElse(null);
+        log.info("Buscando orden con ID: {}", id);
+        return orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Orden no encontrada con ID: " + id));
+    }
+
+    @Transactional
+    public Order saveOrder(OrderDTO orderDTO) {
+        log.info("Guardando nueva orden para cliente: {}", orderDTO.getCustomerName());
+        Order order = new Order();
+        order.setOrderDate(LocalDate.now());
+        mapOrderDtoToEntity(orderDTO, order);
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public Order updateOrder(Long id, OrderDTO orderDTO) {
+        log.info("Actualizando orden con ID: {}", id);
+        Order order = getOrderById(id);
+        mapOrderDtoToEntity(orderDTO, order);
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public void deleteOrder(Long id) {
+        log.info("Eliminando orden con ID: {}", id);
+        Order order = getOrderById(id);
+        orderRepository.delete(order);
     }
 
     public OrderStatus getOrderStatus(Long id) {
-        Order order = getOrderById(id);
-        return (order != null) ? order.getStatus() : null;
+        return getOrderById(id).getStatus();
+    }
+
+    // === MAPPINGS ===
+
+    private void mapProductDtoToEntity(ProductDTO dto, Product entity) {
+        entity.setName(dto.getName());
+        entity.setCategory(dto.getCategory());
+        entity.setPrice(dto.getPrice());
+        entity.setStock(dto.getStock());
+        entity.setBrand(dto.getBrand());
+        entity.setDescription(dto.getDescription());
+        entity.setPetType(dto.getPetType());
+    }
+
+    private void mapOrderDtoToEntity(OrderDTO dto, Order entity) {
+        entity.setCustomerName(dto.getCustomerName());
+        entity.setCustomerEmail(dto.getCustomerEmail());
+        entity.setShippingAddress(dto.getShippingAddress());
+        entity.setTotalAmount(dto.getTotalAmount());
+        entity.setStatus(dto.getStatus());
+        
+        // Mapeo de items
+        if (dto.getItems() != null) {
+            List<OrderItem> items = dto.getItems().stream().map(itemDto -> {
+                OrderItem item = new OrderItem();
+                item.setProductId(itemDto.getProductId());
+                item.setProductName(itemDto.getProductName());
+                item.setQuantity(itemDto.getQuantity());
+                item.setUnitPrice(itemDto.getUnitPrice());
+                item.setOrder(entity); // Establecer la referencia bidireccional
+                return item;
+            }).collect(Collectors.toList());
+            
+            // valida si la entidad ya tiene items, se limpian para evitar duplicados.
+            if (entity.getItems() != null) {
+                entity.getItems().clear();
+                entity.getItems().addAll(items);
+            } else {
+                entity.setItems(items);
+            }
+        }
     }
 }
