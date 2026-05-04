@@ -11,6 +11,13 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
+import java.util.stream.Collectors;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/products")
@@ -24,27 +31,45 @@ public class ProductController {
     }
 
     @GetMapping
-    public List<Product> getAllProducts() {
+    public CollectionModel<EntityModel<Product>> getAllProducts() {
         log.info("Llamada a GET /api/products");
-        return orderService.getAllProducts();
+        List<EntityModel<Product>> products = orderService.getAllProducts().stream()
+                .map(product -> EntityModel.of(product,
+                        linkTo(methodOn(ProductController.class).getProductById(product.getId())).withSelfRel(),
+                        linkTo(methodOn(ProductController.class).getAllProducts()).withRel("products")))
+                .collect(Collectors.toList());
+
+        return CollectionModel.of(products, linkTo(methodOn(ProductController.class).getAllProducts()).withSelfRel());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getProductById(@PathVariable Long id) {
+    public ResponseEntity<EntityModel<Product>> getProductById(@PathVariable Long id) {
         log.info("Llamada a GET /api/products/{}", id);
-        return ResponseEntity.ok(orderService.getProductById(id));
+        Product product = orderService.getProductById(id);
+        EntityModel<Product> resource = EntityModel.of(product,
+                linkTo(methodOn(ProductController.class).getProductById(id)).withSelfRel(),
+                linkTo(methodOn(ProductController.class).getAllProducts()).withRel("products"));
+        return ResponseEntity.ok(resource);
     }
 
     @PostMapping
-    public ResponseEntity<Product> createProduct(@Valid @RequestBody ProductDTO productDTO) {
+    public ResponseEntity<EntityModel<Product>> createProduct(@Valid @RequestBody ProductDTO productDTO) {
         log.info("Llamada a POST /api/products para: {}", productDTO.getName());
-        return new ResponseEntity<>(orderService.saveProduct(productDTO), HttpStatus.CREATED);
+        Product product = orderService.saveProduct(productDTO);
+        EntityModel<Product> resource = EntityModel.of(product,
+                linkTo(methodOn(ProductController.class).getProductById(product.getId())).withSelfRel(),
+                linkTo(methodOn(ProductController.class).getAllProducts()).withRel("products"));
+        return new ResponseEntity<>(resource, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Product> updateProduct(@PathVariable Long id, @Valid @RequestBody ProductDTO productDTO) {
+    public ResponseEntity<EntityModel<Product>> updateProduct(@PathVariable Long id, @Valid @RequestBody ProductDTO productDTO) {
         log.info("Llamada a PUT /api/products/{}", id);
-        return ResponseEntity.ok(orderService.updateProduct(id, productDTO));
+        Product product = orderService.updateProduct(id, productDTO);
+        EntityModel<Product> resource = EntityModel.of(product,
+                linkTo(methodOn(ProductController.class).getProductById(id)).withSelfRel(),
+                linkTo(methodOn(ProductController.class).getAllProducts()).withRel("products"));
+        return ResponseEntity.ok(resource);
     }
 
     @DeleteMapping("/{id}")
@@ -55,8 +80,14 @@ public class ProductController {
     }
 
     @GetMapping("/category/{category}")
-    public List<Product> getProductsByCategory(@PathVariable String category) {
+    public CollectionModel<EntityModel<Product>> getProductsByCategory(@PathVariable String category) {
         log.info("Llamada a GET /api/products/category/{}", category);
-        return orderService.getProductsByCategory(category);
+        List<EntityModel<Product>> products = orderService.getProductsByCategory(category).stream()
+                .map(product -> EntityModel.of(product,
+                        linkTo(methodOn(ProductController.class).getProductById(product.getId())).withSelfRel(),
+                        linkTo(methodOn(ProductController.class).getAllProducts()).withRel("products")))
+                .collect(Collectors.toList());
+
+        return CollectionModel.of(products, linkTo(methodOn(ProductController.class).getProductsByCategory(category)).withSelfRel());
     }
 }

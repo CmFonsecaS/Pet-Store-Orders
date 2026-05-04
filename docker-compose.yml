@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  petstore-app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - TNS_ADMIN=/app/wallet
+    volumes:
+      - ./Wallet_MIDBDUOC:/app/wallet
+    restart: unless-stopped
